@@ -1,16 +1,21 @@
-/.bundle/
-/.yardoc
-/_yardoc/
-/coverage/
 /doc/
 /pkg/
 /spec/reports/
 /tmp/
 
-Gemfile.lock
-
 # rspec failure tracking
 .rspec_status
+.DS_Store
+.rvmrc
+.ruby-version
+coverage
+Gemfile.lock
+*.swp
+*.gem
 
-# Ignore gemset
-/.gem
+/.bundle
+/.yardoc
+/doc
+/log
+/tmp
+/pkg
