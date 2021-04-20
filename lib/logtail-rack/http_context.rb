@@ -11,10 +11,10 @@ module Logtail
         def call(env)
           request = Util::Request.new(env)
           context = Contexts::HTTP.new(
-            host: request.host,
-            method: request.request_method,
+            host: request.host.force_encoding('UTF-8'),
+            method: request.request_method.force_encoding('UTF-8'),
             path: request.path,
-            remote_addr: request.ip,
+            remote_addr: request.ip.force_encoding('UTF-8'),
             request_id: request.request_id
           )
 
