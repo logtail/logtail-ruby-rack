@@ -274,7 +274,7 @@ module Logtail
 
           def force_encoding(value)
             if value.respond_to?(:force_encoding)
-              value.force_encoding('UTF-8')
+              value.dup.force_encoding('UTF-8')
             else
               value
             end
