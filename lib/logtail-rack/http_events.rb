@@ -142,7 +142,7 @@ module Logtail
 
             Config.instance.logger.info do
               http_context = CurrentContext.fetch(:http)
-              content_length = headers[CONTENT_LENGTH_KEY]
+              content_length = headers[CONTENT_LENGTH_KEY]&.to_i
               duration_ms = (Time.now - start) * 1000.0
 
               http_response = HTTPResponse.new(
@@ -217,7 +217,7 @@ module Logtail
 
             Config.instance.logger.info do
               event_body = capture_response_body? ? body : nil
-              content_length = headers[CONTENT_LENGTH_KEY]
+              content_length = headers[CONTENT_LENGTH_KEY]&.to_i
               duration_ms = (Time.now - start) * 1000.0
 
               http_response = HTTPResponse.new(
