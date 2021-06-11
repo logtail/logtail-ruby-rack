@@ -180,7 +180,7 @@ module Logtail
               event_body = capture_request_body? ? request.body_content : nil
               http_request = HTTPRequest.new(
                 body: event_body,
-                content_length: request.content_length,
+                content_length: request.content_length&.to_i,
                 headers: request.headers,
                 host: request.host,
                 method: request.request_method,
@@ -236,7 +236,7 @@ module Logtail
                 event: {
                   http_response_sent: {
                     body: http_response.body,
-                    content_length: http_response.content_length,
+                    content_length: http_response.content_length&.to_i,
                     headers_json: http_response.headers_json,
                     request_id: http_response.request_id,
                     service_name: http_response.service_name,
