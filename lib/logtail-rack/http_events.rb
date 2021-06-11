@@ -142,7 +142,7 @@ module Logtail
 
             Config.instance.logger.info do
               http_context = CurrentContext.fetch(:http)
-              content_length = (headers[CONTENT_LENGTH_KEY].to_i unless headers[CONTENT_LENGTH_KEY].nil?)
+              content_length = safe_to_i(headers[CONTENT_LENGTH_KEY])
               duration_ms = (Time.now - start) * 1000.0
 
               http_response = HTTPResponse.new(
@@ -180,7 +180,7 @@ module Logtail
               event_body = capture_request_body? ? request.body_content : nil
               http_request = HTTPRequest.new(
                 body: event_body,
-                content_length: (request.content_length.to_i unless request.content_length.nil?),
+                content_length: safe_to_i(request.content_length),
                 headers: request.headers,
                 host: request.host,
                 method: request.request_method,
@@ -217,7 +217,7 @@ module Logtail
 
             Config.instance.logger.info do
               event_body = capture_response_body? ? body : nil
-              content_length = (headers[CONTENT_LENGTH_KEY].to_i unless headers[CONTENT_LENGTH_KEY].nil?)
+              content_length = safe_to_i(headers[CONTENT_LENGTH_KEY])
               duration_ms = (Time.now - start) * 1000.0
 
               http_response = HTTPResponse.new(
@@ -270,6 +270,10 @@ module Logtail
             else
               false
             end
+          end
+
+          def safe_to_i(val)
+            val.nil? ? nil : val.to_i
           end
       end
     end
