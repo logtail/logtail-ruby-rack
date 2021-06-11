@@ -182,13 +182,13 @@ module Logtail
                 body: event_body,
                 content_length: (request.content_length.to_i unless request.content_length.nil?),
                 headers: request.headers,
-                host: request.host,
+                host: force_encoding(request.host),
                 method: request.request_method,
                 path: request.path,
                 port: request.port,
-                query_string: request.query_string,
+                query_string: force_encoding(request.query_string),
                 request_id: request.request_id,
-                scheme: request.scheme,
+                scheme: force_encoding(request.scheme),
                 body_limit: self.class.http_body_limit,
                 headers_to_sanitize: self.class.http_header_filters,
               )
@@ -269,6 +269,14 @@ module Logtail
               self.class.silence_request.call(env, request)
             else
               false
+            end
+          end
+
+          def force_encoding(value)
+            if value.respond_to?(:force_encoding)
+              value.dup.force_encoding('UTF-8')
+            else
+              value
             end
           end
       end
