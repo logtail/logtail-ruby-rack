@@ -1,3 +1,5 @@
+require "logtail-rack/util/encoding"
+
 module Logtail
   module Integrations
     module Rack
@@ -24,7 +26,7 @@ module Logtail
           @service_name = attributes[:service_name]
 
           if @headers
-            @headers_json = @headers.to_json
+            @headers_json = Util::Encoding.force_utf8_encoding(@headers).to_json
           end
         end
 
