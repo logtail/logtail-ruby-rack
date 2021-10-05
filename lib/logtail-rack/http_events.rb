@@ -136,14 +136,14 @@ module Logtail
             end
 
           elsif collapse_into_single_event?
-            start = Time.now
-
+            request_start = Time.now
             status, headers, body = @app.call(env)
+            request_end = Time.now
 
             Config.instance.logger.info do
               http_context = CurrentContext.fetch(:http)
               content_length = safe_to_i(headers[CONTENT_LENGTH_KEY])
-              duration_ms = (Time.now - start) * 1000.0
+              duration_ms = (request_end - request_start) * 1000.0
 
               http_response = HTTPResponse.new(
                 content_length: content_length,
@@ -174,8 +174,6 @@ module Logtail
 
             [status, headers, body]
           else
-            start = Time.now
-
             Config.instance.logger.info do
               event_body = capture_request_body? ? request.body_content : nil
               http_request = HTTPRequest.new(
@@ -213,12 +211,14 @@ module Logtail
               }
             end
 
+            request_start = Time.now
             status, headers, body = @app.call(env)
+            request_end = Time.now
 
             Config.instance.logger.info do
               event_body = capture_response_body? ? body : nil
               content_length = safe_to_i(headers[CONTENT_LENGTH_KEY])
-              duration_ms = (Time.now - start) * 1000.0
+              duration_ms = (request_end - request_start) * 1000.0
 
               http_response = HTTPResponse.new(
                 body: event_body,
