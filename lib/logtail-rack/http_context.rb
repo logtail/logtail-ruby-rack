@@ -18,8 +18,9 @@ module Logtail
             request_id: request.request_id
           )
 
-          CurrentContext.add(context.to_hash)
-          @app.call(env)
+          CurrentContext.with(context.to_hash) do
+            @app.call(env)
+          end
         end
       end
     end
