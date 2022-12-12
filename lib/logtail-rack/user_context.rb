@@ -67,10 +67,12 @@ module Logtail
         def call(env)
           user_hash = get_user_hash(env)
           if user_hash
-            CurrentContext.add({user: user_hash})
+            CurrentContext.with({user: user_hash}) do
+              @app.call(env)
+            end
+          else
+            @app.call(env)
           end
-
-          @app.call(env)
         end
 
         private
