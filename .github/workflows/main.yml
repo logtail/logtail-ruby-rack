@@ -8,6 +8,7 @@ jobs:
     runs-on: ubuntu-20.04
 
     strategy:
+      fail-fast: false
       matrix:
         ruby-version:
           - 3.2.1
@@ -23,6 +24,27 @@ jobs:
           - jruby-9.2.14.0
           - truffleruby-23.0.0
           - truffleruby-22.1.0
+        rack-version:
+          - # default Rack version
+
+        include:
+          - ruby-version: 2.7.2
+            rack-version: ~>1.2.0
+          - ruby-version: 2.7.2
+            rack-version: ~>1.2
+          - ruby-version: 2.7.2
+            rack-version: ~>2.0.0
+          - ruby-version: 2.7.2
+            rack-version: ~>2.0
+
+          - ruby-version: 3.2.1
+            rack-version: ~>1.2.0
+          - ruby-version: 3.2.1
+            rack-version: ~>1.2
+          - ruby-version: 3.2.1
+            rack-version: ~>2.0.0
+          - ruby-version: 3.2.1
+            rack-version: ~>2.0
 
     steps:
       - uses: actions/checkout@v2
@@ -32,6 +54,10 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby-version }}
           bundler-cache: true
+
+      - name: Specify "rack" gem version ${{ matrix.rack-version }}
+        if: ${{ matrix.rack-version }}
+        run: bundle add rack --version="${{ matrix.rack-version }}"
 
       - name: Run tests
         run: bundle exec rspec --format documentation
