@@ -102,15 +102,6 @@ module Logtail
             @silence_request
           end
 
-          def http_body_limit=(value)
-            @http_body_limit = value
-          end
-
-          # Accessor method for {#http_body_limit=}
-          def http_body_limit
-            @http_body_limit
-          end
-
           def http_header_filters=(value)
             @http_header_filters = value
           end
@@ -152,7 +143,6 @@ module Logtail
                 request_id: request.request_id,
                 status: status,
                 duration_ms: duration_ms,
-                body_limit: self.class.http_body_limit,
                 headers_to_sanitize: self.class.http_header_filters,
               )
 
@@ -187,7 +177,6 @@ module Logtail
                 query_string: force_encoding(request.query_string),
                 request_id: request.request_id,
                 scheme: force_encoding(request.scheme),
-                body_limit: self.class.http_body_limit,
                 headers_to_sanitize: self.class.http_header_filters,
               )
 
@@ -227,7 +216,6 @@ module Logtail
                 request_id: request.request_id,
                 status: status,
                 duration_ms: duration_ms,
-                body_limit: self.class.http_body_limit,
                 headers_to_sanitize: self.class.http_header_filters,
               )
 
