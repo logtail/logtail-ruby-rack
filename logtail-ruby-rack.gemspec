@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.homepage      = "https://github.com/logtail/logtail-ruby-rack"
   spec.license       = "ISC"
 
-  spec.required_ruby_version     = '>= 2.2.10'
+  spec.required_ruby_version     = '>= 2.3'
 
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/logtail/logtail-ruby-rack"
