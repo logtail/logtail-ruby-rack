@@ -25,23 +25,24 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
   end
 
   it "filter HTTP request headers using http_header_filters" do
-    previous_http_header_filters = Logtail::Integrations::Rack::HTTPEvents.http_header_filters = %w[Authorization]
-    logs = capture_logs { middleware.call mock_request }
+    logs = capture_logs { with_http_header_filters(%w[Authorization]) { middleware.call mock_request } }
 
     request_headers_json = logs.first["event"]["http_request_received"]["headers_json"]
     expect(JSON.parse(request_headers_json)).to eq({"Authorization" => "[FILTERED]", "Content_Type" => "text/plain"})
-  ensure
-    Logtail::Integrations::Rack::HTTPEvents.http_header_filters = previous_http_header_filters
   end
 
   it "filter HTTP request headers using http_header_filters without regard to case or dashes" do
-    previous_http_header_filters = Logtail::Integrations::Rack::HTTPEvents.http_header_filters = %w[authorization CONTENT-TYPE]
-    logs = capture_logs { middleware.call mock_request }
+    logs = capture_logs { with_http_header_filters(%w[authorization CONTENT-TYPE]) { middleware.call mock_request } }
 
     request_headers_json = logs.first["event"]["http_request_received"]["headers_json"]
     expect(JSON.parse(request_headers_json)).to eq({"Authorization" => "[FILTERED]", "Content_Type" => "[FILTERED]"})
-  ensure
-    Logtail::Integrations::Rack::HTTPEvents.http_header_filters = previous_http_header_filters
+  end
+
+  it "ignores non-existent headers in http_header_filters" do
+    logs = capture_logs { with_http_header_filters(%w[Not_Found_Header]) { middleware.call mock_request } }
+
+    request_headers_json = logs.first["event"]["http_request_received"]["headers_json"]
+    expect(JSON.parse(request_headers_json)).to eq({"Authorization" => "Bearer secret_token", "Content_Type" => "text/plain"})
   end
 
   def capture_logs(&blk)
@@ -57,5 +58,13 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     string_io.string.split("\n").map { |record| JSON.parse(record) }
   ensure
     Logtail::Config.instance.logger = old_logger
+  end
+
+  def with_http_header_filters(headers, &blk)
+    previous_http_header_filters = Logtail::Integrations::Rack::HTTPEvents.http_header_filters = headers
+
+    blk.call
+  ensure
+    Logtail::Integrations::Rack::HTTPEvents.http_header_filters = previous_http_header_filters
   end
 end
