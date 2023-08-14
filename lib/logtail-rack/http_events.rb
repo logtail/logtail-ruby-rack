@@ -102,13 +102,23 @@ module Logtail
             @silence_request
           end
 
+          # Filter sensitive HTTP headers (such as "Authorization: Bearer secret_token")
+          #
+          # Filtered HTTP header values will be sent to Better Stack as "[FILTERED]"
+          #
+          # @example
+          #   Logtail::Integrations::Rack::HTTPEvents.http_header_filters = ["Authorization"]
           def http_header_filters=(value)
-            @http_header_filters = value
+            @http_header_filters = value.map { |header_name| normalize_header_name(header_name) }
           end
 
           # Accessor method for {#http_header_filters=}
           def http_header_filters
             @http_header_filters
+          end
+
+          def normalize_header_name(name)
+            name.to_s.downcase.gsub("-", "_")
           end
         end
 
@@ -138,12 +148,11 @@ module Logtail
 
               http_response = HTTPResponse.new(
                 content_length: content_length,
-                headers: headers,
+                headers: filter_http_headers(headers),
                 http_context: http_context,
                 request_id: request.request_id,
                 status: status,
                 duration_ms: duration_ms,
-                headers_to_sanitize: self.class.http_header_filters,
               )
 
               {
@@ -169,7 +178,7 @@ module Logtail
               http_request = HTTPRequest.new(
                 body: event_body,
                 content_length: safe_to_i(request.content_length),
-                headers: request.headers,
+                headers: filter_http_headers(request.headers),
                 host: force_encoding(request.host),
                 method: request.request_method,
                 path: request.path,
@@ -177,7 +186,6 @@ module Logtail
                 query_string: force_encoding(request.query_string),
                 request_id: request.request_id,
                 scheme: force_encoding(request.scheme),
-                headers_to_sanitize: self.class.http_header_filters,
               )
 
               {
@@ -212,11 +220,10 @@ module Logtail
               http_response = HTTPResponse.new(
                 body: event_body,
                 content_length: content_length,
-                headers: headers,
+                headers: filter_http_headers(headers),
                 request_id: request.request_id,
                 status: status,
                 duration_ms: duration_ms,
-                headers_to_sanitize: self.class.http_header_filters,
               )
 
               {
@@ -257,6 +264,13 @@ module Logtail
               self.class.silence_request.call(env, request)
             else
               false
+            end
+          end
+
+          def filter_http_headers(headers)
+            headers.each do |name, _|
+              normalized_header_name = self.class.normalize_header_name(name)
+              headers[name] = "[FILTERED]" if self.class.http_header_filters&.include?(normalized_header_name)
             end
           end
 
