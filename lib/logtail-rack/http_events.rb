@@ -6,6 +6,7 @@ require "logtail/current_context"
 require "logtail-rack/http_request"
 require "logtail-rack/http_response"
 require "logtail-rack/middleware"
+require "logtail-rack/util/encoding"
 
 module Logtail
   module Integrations
@@ -179,13 +180,13 @@ module Logtail
                 body: event_body,
                 content_length: safe_to_i(request.content_length),
                 headers: filter_http_headers(request.headers),
-                host: force_encoding(request.host),
+                host: Util::Encoding.force_utf8_encoding(request.host),
                 method: request.request_method,
                 path: request.path,
                 port: request.port,
-                query_string: force_encoding(request.query_string),
+                query_string: Util::Encoding.force_utf8_encoding(request.query_string),
                 request_id: request.request_id,
-                scheme: force_encoding(request.scheme),
+                scheme: Util::Encoding.force_utf8_encoding(request.scheme),
               )
 
               {
@@ -276,14 +277,6 @@ module Logtail
 
           def safe_to_i(val)
             val.nil? ? nil : val.to_i
-          end
-
-          def force_encoding(value)
-            if value.respond_to?(:force_encoding)
-              value.dup.force_encoding('UTF-8')
-            else
-              value
-            end
           end
       end
     end

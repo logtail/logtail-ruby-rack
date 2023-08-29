@@ -1,6 +1,7 @@
 require "logtail/contexts/http"
 require "logtail/current_context"
 require "logtail-rack/middleware"
+require "logtail-rack/util/encoding"
 require "logtail-rack/util/request"
 
 module Logtail
@@ -11,10 +12,10 @@ module Logtail
         def call(env)
           request = Util::Request.new(env)
           context = Contexts::HTTP.new(
-            host: request.host.force_encoding('UTF-8'),
-            method: request.request_method.force_encoding('UTF-8'),
+            host: Util::Encoding.force_utf8_encoding(request),
+            method: Util::Encoding.force_utf8_encoding(request.request_method),
             path: request.path,
-            remote_addr: request.ip.force_encoding('UTF-8'),
+            remote_addr: Util::Encoding.force_utf8_encoding(request.ip),
             request_id: request.request_id
           )
 
