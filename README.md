@@ -2,7 +2,7 @@
 
 [![ISC License](https://img.shields.io/badge/license-ISC-ff69b4.svg)](LICENSE.md)
 [![Gem Version](https://badge.fury.io/rb/logtail-rack.svg)](https://badge.fury.io/rb/logtail-rack)
-[![Build Status](https://github.com/logtail/logtail-ruby-rack/workflows/build/badge.svg)](https://github.com/logtail/logtail-ruby-rack/actions?query=workflow%3Abuild)
+[![Build Status](https://github.com/logtail/logtail-ruby-rack/actions/workflows/main.yml/badge.svg)](https://github.com/logtail/logtail-ruby-rack/actions/workflows/main.yml)
 
 This library integrates the [`logtail` Ruby library](https://github.com/logtail/logtail-ruby) with the [rack](https://github.com/rack/rack) framework,
 turning your Rack logs into rich structured events.
