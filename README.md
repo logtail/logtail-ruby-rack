@@ -9,7 +9,7 @@
 This library integrates the [`logtail` Ruby library](https://github.com/logtail/logtail-ruby) with the [rack](https://github.com/rack/rack) framework,
 turning your Rack logs into rich structured events.
 
-* **Sign-up: [https://logs.betterstack.com]([https://logtail.com](https://logs.betterstack.com))**
+* **Sign-up: [https://logs.betterstack.com](https://logs.betterstack.com)**
 
 Collect logs directly from your Ruby Rack projects. To start logging Ruby projects explore the [Logtail Ruby library](https://github.com/logtail/logtail-ruby).
 
