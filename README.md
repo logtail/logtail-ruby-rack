@@ -1,5 +1,7 @@
 # 🪵 Logtail Integration For Rack
 
+  [![Logtail ruby dashboard](https://user-images.githubusercontent.com/19272921/154085622-59997d5a-3f91-4bc9-a815-3b8ead16d28d.jpeg)](https://betterstack.com/logtail)
+
 [![ISC License](https://img.shields.io/badge/license-ISC-ff69b4.svg)](LICENSE.md)
 [![Gem Version](https://badge.fury.io/rb/logtail-rack.svg)](https://badge.fury.io/rb/logtail-rack)
 [![Build Status](https://github.com/logtail/logtail-ruby-rack/actions/workflows/main.yml/badge.svg)](https://github.com/logtail/logtail-ruby-rack/actions/workflows/main.yml)
@@ -7,11 +9,14 @@
 This library integrates the [`logtail` Ruby library](https://github.com/logtail/logtail-ruby) with the [rack](https://github.com/rack/rack) framework,
 turning your Rack logs into rich structured events.
 
-* **Sign-up: [https://logtail.com](https://logtail.com)**
+* **Sign-up: [https://logs.betterstack.com]([https://logtail.com](https://logs.betterstack.com))**
 
-Collect logs directly from your Ruby on Rails projects. To start logging Ruby projects explore the [Logtail Ruby library](https://github.com/logtail/logtail-ruby).
+Collect logs directly from your Ruby Rack projects. To start logging Ruby projects explore the [Logtail Ruby library](https://github.com/logtail/logtail-ruby).
 
-[Logtail](https://betterstack.com/logtail) is a hosted service that centralizes all of your logs into one place. Allowing for analysis, correlation and filtering with SQL. Actionable Grafana dashboards and collaboration come built-in. Logtail works with [any language or platform and any data source](https://betterstack.com/docs/logs/).
+[Better Stack](https://logs.betterstack.com) is a hosted service that centralizes all of your logs into one place.
+Allowing for analysis, correlation and filtering with SQL.
+Actionable Grafana dashboards and collaboration come built-in.
+Logtail works with [any language or platform and any data source](https://betterstack.com/docs/logs/).
 
 ### Features
 - Simple integration.
