@@ -19,4 +19,4 @@ Please let us know at [hello@betterstack.com](mailto:hello@betterstack.com). We'
 
 ---
 
-[ISC license](https://github.com/logtail/logtail-ruby-rack/blob/master/LICENSE.md), [example project](https://github.com/logtail/logtail-ruby-rack/tree/master/example-project)
+[ISC license](https://github.com/logtail/logtail-ruby-rack/blob/main/LICENSE.md), [example project](https://github.com/logtail/logtail-ruby-rack/tree/main/example-project)
