@@ -269,10 +269,11 @@ module Logtail
           end
 
           def filter_http_headers(headers)
-            headers.each do |name, _|
-              normalized_header_name = self.class.normalize_header_name(name)
-              headers[name] = "[FILTERED]" if self.class.http_header_filters&.include?(normalized_header_name)
-            end
+            headers.map do |name, value|
+              normalized_name = self.class.normalize_header_name(name)
+              is_filtered = self.class.http_header_filters&.include?(normalized_name)
+              [name, is_filtered ? "[FILTERED]" : value]
+            end.to_h
           end
 
           def safe_to_i(val)
