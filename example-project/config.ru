@@ -6,7 +6,7 @@ use Logtail::Integrations::Rack::HTTPContext
 use Logtail::Integrations::Rack::HTTPEvents
 use Logtail::Integrations::Rack::ErrorEvent
 
-# HTTP IO device sends logs to Better Stack, replace <SOURCE_TOKEN> with your real source token
+# HTTP IO device sends logs to Better Stack, replace <source_token> and <ingesting_host> with your real source token and ingesting host
 http_io_device = Logtail::LogDevices::HTTP.new("<source_token>", logtail_host: "<ingesting_host>")
 
 # STDOUT IO device sends logs to console output
