@@ -1,23 +1,21 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    logtail (0.1.13)
+    logtail (0.1.15)
       msgpack (~> 1.0)
-    logtail-rack (0.2.5)
+    logtail-rack (0.2.6)
       logtail (~> 0.1)
       rack (>= 1.2, < 4.0)
-    msgpack (1.7.2)
-    rack (3.0.0)
-    rackup (2.1.0)
+    msgpack (1.8.0)
+    rack (3.1.9)
+    rackup (2.2.1)
       rack (>= 3)
-      webrick (~> 1.8)
-    webrick (1.8.1)
 
 PLATFORMS
   arm64-darwin-22
 
 DEPENDENCIES
-  logtail-rack (~> 0.2.5)
+  logtail-rack (~> 0.2.6)
   rack (~> 3.0)
   rackup (~> 2.1)
 

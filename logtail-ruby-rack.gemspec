@@ -5,8 +5,8 @@ require "logtail-rack/version"
 Gem::Specification.new do |spec|
   spec.name          = "logtail-rack"
   spec.version       = Logtail::Integrations::Rack::VERSION
-  spec.authors       = ["Logtail"]
-  spec.email         = ["hi@logtail.com"]
+  spec.authors       = ["Better Stack"]
+  spec.email         = ["hello@betterstack.com"]
 
   spec.summary       = %q{Logtail integration for Rack}
   spec.homepage      = "https://github.com/logtail/logtail-ruby-rack"

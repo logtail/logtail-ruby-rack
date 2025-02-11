@@ -15,7 +15,7 @@ This will install all dependencies listed in the `Gemfile.lock` file.
 Then replace `<source_token>` and `<ingesting_host>` in `config.ru` with your actual source token and ingesting host which you can find by going to [Better Stack Telemetry](https://teleemetry.betterstack.com/dashboard) -> Source -> Configure.
 
 ```ruby
-http_io_device = Logtail::LogDevices::HTTP.new("<source_token>", logtail_host: "<ingesting_host>")
+http_io_device = Logtail::LogDevices::HTTP.new("<source_token>", ingesting_host: "<ingesting_host>")
 ```
 
 ## Run the example project
