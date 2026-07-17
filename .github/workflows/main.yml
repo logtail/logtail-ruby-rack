@@ -26,16 +26,21 @@ jobs:
           - "2.7"
           - "2.6"
           - "2.5"
-          - "2.4"
-          - "2.3"
-          - "jruby-9.4.3.0"
-          - "jruby-9.2.14.0"
-          - "truffleruby-23.0.0"
-          - "truffleruby-22.1.0"
+          - "truffleruby"
         rack-version:
           - "" # default Rack version
 
+        exclude:
+          # RubyGems on Ruby 2.5 ignores rack's required_ruby_version and
+          # installs a Rack that no longer runs on 2.5 — test it with a
+          # compatible Rack pinned below instead
+          - ruby-version: "2.5"
+            rack-version: ""
+
         include:
+          - ruby-version: "2.5"
+            rack-version: "~>2.2"
+
           - ruby-version: "2.7"
             rack-version: "~>1.2.0"
           - ruby-version: "2.7"
