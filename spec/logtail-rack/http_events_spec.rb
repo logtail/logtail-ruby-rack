@@ -17,8 +17,32 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     expect(logs.map { |log| log['message'] }).to match(['Started GET "/test-page"', /Completed 200 OK in \d+\.\d+ms/])
   end
 
-  it "log HTTP request headers" do
+  it "log HTTP request headers, filtering the Authorization header by default" do
     logs = capture_logs { middleware.call mock_request }
+
+    request_headers_json = logs.first["event"]["http_request_received"]["headers_json"]
+    expect(JSON.parse(request_headers_json)).to eq({"Authorization" => "[FILTERED]", "Content_Type" => "text/plain"})
+  end
+
+  it "filter credential headers in the request and the response by default" do
+    app = ->(env) { [200, { "Content-Type" => "text/plain", "Set-Cookie" => "session=abc" }, "app"] }
+    request = Rack::MockRequest.env_for('https://example.com/test-page', {
+      'HTTP_AUTHORIZATION' => 'Bearer secret_token',
+      'HTTP_PROXY_AUTHORIZATION' => 'Basic cHJveHk6c2VjcmV0',
+      'HTTP_COOKIE' => 'session=abc',
+      'HTTP_CONTENT_TYPE' => 'text/plain',
+    })
+
+    logs = capture_logs { described_class.new(app).call request }
+
+    request_headers_json = logs.first["event"]["http_request_received"]["headers_json"]
+    expect(JSON.parse(request_headers_json)).to eq({"Authorization" => "[FILTERED]", "Proxy_Authorization" => "[FILTERED]", "Cookie" => "[FILTERED]", "Content_Type" => "text/plain"})
+    response_headers_json = logs.last["event"]["http_response_sent"]["headers_json"]
+    expect(JSON.parse(response_headers_json)).to eq({"Content-Type" => "text/plain", "Set-Cookie" => "[FILTERED]"})
+  end
+
+  it "log every header when http_header_filters is set to an empty list" do
+    logs = capture_logs { with_http_header_filters([]) { middleware.call mock_request } }
 
     request_headers_json = logs.first["event"]["http_request_received"]["headers_json"]
     expect(JSON.parse(request_headers_json)).to eq({"Authorization" => "Bearer secret_token", "Content_Type" => "text/plain"})
@@ -61,10 +85,10 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
   end
 
   def with_http_header_filters(headers, &blk)
-    previous_http_header_filters = Logtail::Integrations::Rack::HTTPEvents.http_header_filters = headers
+    Logtail::Integrations::Rack::HTTPEvents.http_header_filters = headers
 
     blk.call
   ensure
-    Logtail::Integrations::Rack::HTTPEvents.http_header_filters = previous_http_header_filters
+    Logtail::Integrations::Rack::HTTPEvents.http_header_filters = Logtail::Integrations::Rack::HTTPEvents::DEFAULT_HTTP_HEADER_FILTERS
   end
 end
