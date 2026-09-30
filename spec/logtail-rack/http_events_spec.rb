@@ -69,6 +69,29 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     expect(JSON.parse(request_headers_json)).to eq({"Authorization" => "Bearer secret_token", "Content_Type" => "text/plain"})
   end
 
+  it "log the response duration from the monotonic clock in milliseconds, rounded to one decimal" do
+    app = ->(env) { [200, { "content-type" => "text/plain" }, ["hello"]] }
+    allow(Process).to receive(:clock_gettime).and_call_original
+    allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(100.0, 100.0392345)
+
+    logs = capture_logs { described_class.new(app).call mock_request }
+
+    expect(logs.last["message"]).to eq("Completed 200 OK in 39.2ms")
+    expect(logs.last["event"]["http_response_sent"]["duration_ms"]).to eq(39.2)
+  end
+
+  it "log the response duration rounded to one decimal in the single collapsed event" do
+    app = ->(env) { [200, { "content-type" => "text/plain" }, ["hello"]] }
+    stack = Logtail::Integrations::Rack::HTTPContext.new(described_class.new(app))
+    allow(Process).to receive(:clock_gettime).and_call_original
+    allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(100.0, 100.0392345)
+
+    logs = capture_logs { with_collapse_into_single_event { stack.call mock_request } }
+
+    expect(logs.first["message"]).to eq("GET /test-page completed with 200 OK in 39.2ms")
+    expect(logs.first["event"]["http_response_sent"]["duration_ms"]).to eq(39.2)
+  end
+
   def capture_logs(&blk)
     old_logger = Logtail::Config.instance.logger
 
@@ -90,5 +113,13 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     blk.call
   ensure
     Logtail::Integrations::Rack::HTTPEvents.http_header_filters = Logtail::Integrations::Rack::HTTPEvents::DEFAULT_HTTP_HEADER_FILTERS
+  end
+
+  def with_collapse_into_single_event(&blk)
+    Logtail::Integrations::Rack::HTTPEvents.collapse_into_single_event = true
+
+    blk.call
+  ensure
+    Logtail::Integrations::Rack::HTTPEvents.collapse_into_single_event = false
   end
 end
