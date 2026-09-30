@@ -15,6 +15,8 @@ module Logtail
       # response events. The {Events::HTTPRequest} and {Events::HTTPResponse} events
       # respectively.
       class HTTPEvents < Middleware
+        DEFAULT_HTTP_HEADER_FILTERS = ["Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"].freeze
+
         class << self
           # Allows you to capture the HTTP request body, default is off (false).
           #
@@ -107,8 +109,11 @@ module Logtail
           #
           # Filtered HTTP header values will be sent to Better Stack as "[FILTERED]"
           #
+          # {DEFAULT_HTTP_HEADER_FILTERS} are filtered out of the box. Setting this replaces
+          # the whole list, pass an empty list to log every header.
+          #
           # @example
-          #   Logtail::Integrations::Rack::HTTPEvents.http_header_filters = ["Authorization"]
+          #   Logtail::Integrations::Rack::HTTPEvents.http_header_filters = Logtail::Integrations::Rack::HTTPEvents::DEFAULT_HTTP_HEADER_FILTERS + ["X-Api-Key"]
           def http_header_filters=(value)
             @http_header_filters = value.map { |header_name| normalize_header_name(header_name) }
           end
@@ -122,6 +127,8 @@ module Logtail
             name.to_s.downcase.gsub("-", "_")
           end
         end
+
+        self.http_header_filters = DEFAULT_HTTP_HEADER_FILTERS
 
         CONTENT_LENGTH_KEY = 'Content-Length'.freeze
 
@@ -271,7 +278,7 @@ module Logtail
           def filter_http_headers(headers)
             headers.map do |name, value|
               normalized_name = self.class.normalize_header_name(name)
-              is_filtered = self.class.http_header_filters&.include?(normalized_name)
+              is_filtered = self.class.http_header_filters.include?(normalized_name)
               [name, is_filtered ? "[FILTERED]" : value]
             end.to_h
           end
