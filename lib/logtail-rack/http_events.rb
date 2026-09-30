@@ -130,7 +130,7 @@ module Logtail
 
         self.http_header_filters = DEFAULT_HTTP_HEADER_FILTERS
 
-        CONTENT_LENGTH_KEY = normalize_header_name('Content-Length').freeze
+        CONTENT_LENGTH_KEY = 'content-length'.freeze
 
         def call(env)
           request = Util::Request.new(env)
@@ -285,7 +285,7 @@ module Logtail
 
           # Rack 3 applications return "content-length", older ones usually "Content-Length".
           def response_content_length(headers)
-            _name, value = headers.find { |name, _value| self.class.normalize_header_name(name) == CONTENT_LENGTH_KEY }
+            _name, value = headers.find { |name, _value| name.to_s.downcase == CONTENT_LENGTH_KEY }
             safe_to_i(value)
           end
 
