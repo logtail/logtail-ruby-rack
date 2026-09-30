@@ -69,6 +69,47 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     expect(JSON.parse(request_headers_json)).to eq({"Authorization" => "Bearer secret_token", "Content_Type" => "text/plain"})
   end
 
+  it "log the content length of a Rack 3 response with lower-case header names" do
+    app = ->(env) { [200, { "content-type" => "text/plain", "content-length" => "5" }, ["hello"]] }
+
+    logs = capture_logs { described_class.new(app).call mock_request }
+
+    http_response_sent = logs.last["event"]["http_response_sent"]
+    expect(http_response_sent["content_length"]).to eq(5)
+    expect(JSON.parse(http_response_sent["headers_json"])).to eq({"content-type" => "text/plain", "content-length" => "5"})
+  end
+
+  it "log the content length of a response with a Content-Length header" do
+    app = ->(env) { [200, { "Content-Type" => "text/plain", "Content-Length" => "5" }, ["hello"]] }
+
+    logs = capture_logs { described_class.new(app).call mock_request }
+
+    http_response_sent = logs.last["event"]["http_response_sent"]
+    expect(http_response_sent["content_length"]).to eq(5)
+    expect(JSON.parse(http_response_sent["headers_json"])).to eq({"Content-Type" => "text/plain", "Content-Length" => "5"})
+  end
+
+  it "log the content length of a response with Rack::Headers" do
+    skip "Rack::Headers is new in Rack 3" unless defined?(Rack::Headers)
+    app = ->(env) { [200, Rack::Headers["Content-Type" => "text/plain", "Content-Length" => "5"], ["hello"]] }
+
+    logs = capture_logs { described_class.new(app).call mock_request }
+
+    http_response_sent = logs.last["event"]["http_response_sent"]
+    expect(http_response_sent["content_length"]).to eq(5)
+    expect(JSON.parse(http_response_sent["headers_json"])).to eq({"content-type" => "text/plain", "content-length" => "5"})
+  end
+
+  it "log the content length of a Rack 3 response in the single collapsed event" do
+    app = ->(env) { [200, { "content-type" => "text/plain", "content-length" => "5" }, ["hello"]] }
+    stack = Logtail::Integrations::Rack::HTTPContext.new(described_class.new(app))
+
+    logs = capture_logs { with_collapse_into_single_event { stack.call mock_request } }
+
+    expect(logs.length).to eq(1)
+    expect(logs.first["event"]["http_response_sent"]["content_length"]).to eq(5)
+  end
+
   def capture_logs(&blk)
     old_logger = Logtail::Config.instance.logger
 
@@ -90,5 +131,13 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     blk.call
   ensure
     Logtail::Integrations::Rack::HTTPEvents.http_header_filters = Logtail::Integrations::Rack::HTTPEvents::DEFAULT_HTTP_HEADER_FILTERS
+  end
+
+  def with_collapse_into_single_event(&blk)
+    Logtail::Integrations::Rack::HTTPEvents.collapse_into_single_event = true
+
+    blk.call
+  ensure
+    Logtail::Integrations::Rack::HTTPEvents.collapse_into_single_event = false
   end
 end
