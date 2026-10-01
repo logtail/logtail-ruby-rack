@@ -1,3 +1,5 @@
+require "json"
+
 require "logtail-rack/util/encoding"
 
 module Logtail
@@ -21,7 +23,7 @@ module Logtail
           @duration_ms = attributes[:duration_ms]
 
           if @headers
-            @headers_json = Util::Encoding.force_utf8_encoding(@headers).to_json
+            @headers_json = ::JSON.generate(Util::Encoding.force_utf8_encoding(@headers))
           end
         end
 
