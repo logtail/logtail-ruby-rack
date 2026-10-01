@@ -25,7 +25,10 @@ module Logtail
             if session = env['rack.session']
               if session.respond_to?(:id)
                 Logtail::Config.instance.debug { "Rack env session detected, using id attribute" }
-                session.id
+                id = session.id
+                # Since Rack 1.6.12 and 2.0.8 a Rack::Session::SessionId, which MessagePack can't encode. Its public id
+                # is the session cookie of server-side stores, the private id a hash of it that can't be used as one.
+                id.respond_to?(:private_id) ? id.private_id : id
               elsif session.respond_to?(:[])
                 Logtail::Config.instance.debug { "Rack env session detected, using the session_id key" }
                 session["session_id"]
