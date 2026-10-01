@@ -1,3 +1,5 @@
+require "logtail/config"
+
 module Logtail
   module Integrations
     module Rack
@@ -22,6 +24,15 @@ module Logtail
         def initialize(app)
           @app = app
         end
+
+        private
+          # Logs the event the block builds. Logging must never fail the request, so an error raised
+          # while building or writing the event only goes to the debug logger.
+          def log_safely(severity, &block)
+            Config.instance.logger.public_send(severity, &block)
+          rescue StandardError => e
+            Config.instance.debug { "#{self.class.name} could not log an event: #{e.inspect}\n\n#{e.backtrace}" }
+          end
       end
     end
   end

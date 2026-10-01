@@ -149,8 +149,8 @@ module Logtail
             status, headers, body = @app.call(env)
             request_end = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-            Config.instance.logger.info do
-              http_context = CurrentContext.fetch(:http)
+            log_safely(:info) do
+              http_context = CurrentContext.fetch(:http, nil)
               content_length = response_content_length(headers)
               duration_ms = ((request_end - request_start) * 1000.0).round(1)
 
@@ -181,7 +181,7 @@ module Logtail
 
             [status, headers, body]
           else
-            Config.instance.logger.info do
+            log_safely(:info) do
               event_body = capture_request_body? ? request.body_content : nil
               http_request = HTTPRequest.new(
                 body: event_body,
@@ -220,8 +220,9 @@ module Logtail
             status, headers, body = @app.call(env)
             request_end = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-            Config.instance.logger.info do
-              event_body = capture_response_body? ? body : nil
+            log_safely(:info) do
+              # Only an Array body can be read twice, other bodies may stream to the server once
+              event_body = capture_response_body? && body.is_a?(Array) ? body.join : nil
               content_length = response_content_length(headers)
               duration_ms = ((request_end - request_start) * 1000.0).round(1)
 

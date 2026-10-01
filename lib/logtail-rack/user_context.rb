@@ -93,6 +93,9 @@ module Logtail
               Logtail::Config.instance.debug { "Could not locate any user data" }
               nil
             end
+          rescue StandardError => e
+            Logtail::Config.instance.debug { "Could not obtain the user context: #{e.inspect}\n\n#{e.backtrace}" }
+            nil
           end
 
           def get_user_object_hash(user)
