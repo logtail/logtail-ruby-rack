@@ -17,6 +17,105 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     expect(logs.map { |log| log['message'] }).to match(['Started GET "/test-page"', /Completed 200 OK in \d+\.\d+ms/])
   end
 
+  it "return the app's response when collapsing into a single event without HTTPContext" do
+    app = ->(env) { [200, { "content-type" => "text/plain" }, ["hello"]] }
+
+    response = nil
+    logs = capture_logs { with_collapse_into_single_event { response = described_class.new(app).call(mock_request) } }
+
+    expect(response).to eq([200, { "content-type" => "text/plain" }, ["hello"]])
+    expect(logs.map { |log| log['message'] }).to match([/\ACompleted 200 OK in \d+\.\d+ms\z/])
+  end
+
+  it "capture the request body and leave it for the app" do
+    app = ->(env) { [200, { "content-type" => "text/plain" }, [env["rack.input"].read]] }
+    request = Rack::MockRequest.env_for('https://example.com/form', method: "POST", input: "name=value")
+
+    response = nil
+    logs = capture_logs { with_capture_request_body { response = described_class.new(app).call(request) } }
+
+    expect(response[2]).to eq(["name=value"])
+    expect(logs.first["event"]["http_request_received"]["body"]).to eq("name=value")
+  end
+
+  it "leave the request body for the app when the input can't be rewound" do
+    app = ->(env) { [200, { "content-type" => "text/plain" }, [env["rack.input"].read]] }
+    # Rack 3 doesn't require rack.input to be rewindable
+    input = StringIO.new("name=value")
+    input.singleton_class.send(:undef_method, :rewind)
+    request = Rack::MockRequest.env_for('https://example.com/form', method: "POST", input: input)
+
+    response = nil
+    logs = capture_logs { with_capture_request_body { response = described_class.new(app).call(request) } }
+
+    expect(response).to eq([200, { "content-type" => "text/plain" }, ["name=value"]])
+    expect(logs.first["event"]["http_request_received"]["body"]).to be_nil
+  end
+
+  it "return the app's response when capturing the request body without a request input" do
+    app = ->(env) { [200, { "content-type" => "text/plain" }, ["hello"]] }
+    # Rack 3.1 and later may leave rack.input out
+    request = Rack::MockRequest.env_for('https://example.com/test-page')
+    request.delete("rack.input")
+
+    response = nil
+    logs = capture_logs { with_capture_request_body { response = described_class.new(app).call(request) } }
+
+    expect(response).to eq([200, { "content-type" => "text/plain" }, ["hello"]])
+    expect(logs.first["event"]["http_request_received"]["body"]).to be_nil
+  end
+
+  it "log a captured Array response body as one String" do
+    app = ->(env) { [200, { "content-type" => "text/plain" }, ["hello", " world"]] }
+
+    logs = capture_logs { with_capture_response_body { described_class.new(app).call(mock_request) } }
+
+    expect(logs.last["event"]["http_response_sent"]["body"]).to eq("hello world")
+  end
+
+  it "skip capturing a response body that isn't an Array and return it untouched" do
+    # Can be iterated only once, by the server
+    body = Object.new
+    def body.each
+      yield "hello"
+    end
+    app = ->(env) { [200, { "content-type" => "text/plain" }, body] }
+
+    response = nil
+    logs = capture_logs { with_capture_response_body { response = described_class.new(app).call(mock_request) } }
+
+    expect(response[2]).to be(body)
+    expect(logs.last["event"]["http_response_sent"]["body"]).to be_nil
+  end
+
+  it "return the app's response and log the response when logging the request raises" do
+    app = ->(env) { [200, { "content-type" => "text/plain" }, ["hello"]] }
+    # Rack::Request#host raises ArgumentError for invalid UTF-8 in a UTF-8 string
+    request = Rack::MockRequest.env_for('https://example.com/test-page', 'HTTP_X_FORWARDED_HOST' => "\xFF")
+
+    response = nil
+    logs = nil
+    debug_logs = capture_debug_logs { logs = capture_logs { response = described_class.new(app).call(request) } }
+
+    expect(response).to eq([200, { "content-type" => "text/plain" }, ["hello"]])
+    expect(logs.map { |log| log['message'] }).to match([/\ACompleted 200 OK in \d+\.\d+ms\z/])
+    expect(debug_logs).to include("Logtail::Integrations::Rack::HTTPEvents could not log an event: #<ArgumentError: invalid byte sequence in UTF-8>")
+  end
+
+  it "return the app's response when the logger raises" do
+    app = ->(env) { [200, { "content-type" => "text/plain" }, ["hello"]] }
+    logger = Logtail::Logger.new(StringIO.new)
+    # Like the JSON formatter does with json 3 and ActiveSupport 8.0 or older
+    logger.formatter = ->(*) { raise ArgumentError, "unknown keyword: :quirks_mode" }
+    allow(Logtail::Config.instance).to receive(:logger).and_return(logger)
+
+    response = nil
+    debug_logs = capture_debug_logs { response = described_class.new(app).call(mock_request) }
+
+    expect(response).to eq([200, { "content-type" => "text/plain" }, ["hello"]])
+    expect(debug_logs.scan("Logtail::Integrations::Rack::HTTPEvents could not log an event: #<ArgumentError: unknown keyword: :quirks_mode>").length).to eq(2)
+  end
+
   it "log HTTP request headers, filtering the Authorization header by default" do
     logs = capture_logs { middleware.call mock_request }
 
@@ -146,6 +245,33 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     string_io.string.split("\n").map { |record| JSON.parse(record) }
   ensure
     Logtail::Config.instance.logger = old_logger
+  end
+
+  def capture_debug_logs(&blk)
+    string_io = StringIO.new
+    Logtail::Config.instance.debug_logger = ::Logger.new(string_io)
+
+    blk.call
+
+    string_io.string
+  ensure
+    Logtail::Config.instance.debug_logger = nil
+  end
+
+  def with_capture_request_body(&blk)
+    Logtail::Integrations::Rack::HTTPEvents.capture_request_body = true
+
+    blk.call
+  ensure
+    Logtail::Integrations::Rack::HTTPEvents.capture_request_body = false
+  end
+
+  def with_capture_response_body(&blk)
+    Logtail::Integrations::Rack::HTTPEvents.capture_response_body = true
+
+    blk.call
+  ensure
+    Logtail::Integrations::Rack::HTTPEvents.capture_response_body = false
   end
 
   def with_http_header_filters(headers, &blk)
