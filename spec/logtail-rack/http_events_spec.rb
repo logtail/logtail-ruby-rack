@@ -69,6 +69,93 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     expect(JSON.parse(request_headers_json)).to eq({"Authorization" => "Bearer secret_token", "Content_Type" => "text/plain"})
   end
 
+  it "filter query string parameters with secrets in their names by default" do
+    expect(described_class::DEFAULT_QUERY_STRING_FILTERS).to eq(%w[passw secret token _key crypt salt certificate otp ssn cvv cvc])
+    expect(described_class.query_string_filters).to eq(described_class::DEFAULT_QUERY_STRING_FILTERS)
+
+    logs = capture_logs { middleware.call request_with_query_string("password=hunter2&page=2&Api_Key=k1&ACCESS_TOKEN=t1&client_secret=s1&q=search") }
+
+    query_string = logs.first["event"]["http_request_received"]["query_string"]
+    expect(query_string).to eq("password=[FILTERED]&page=2&Api_Key=[FILTERED]&ACCESS_TOKEN=[FILTERED]&client_secret=[FILTERED]&q=search")
+  end
+
+  it "leave the rest of the query string byte for byte unchanged" do
+    logs = capture_logs { middleware.call request_with_query_string("q=caf%C3%A9+au+lait&empty=&flag&a=1;b=2&x=y%26z&list[]=1&list[]=2&token=abc=def&=x&page=3") }
+
+    query_string = logs.first["event"]["http_request_received"]["query_string"]
+    expect(query_string).to eq("q=caf%C3%A9+au+lait&empty=&flag&a=1;b=2&x=y%26z&list[]=1&list[]=2&token=[FILTERED]&=x&page=3")
+  end
+
+  it "match the URL-decoded full name of nested query string parameters" do
+    logs = capture_logs { middleware.call request_with_query_string("user[password]=p1&user%5Bpassword_confirmation%5D=p2&user[name]=Jane&pass%77ord=p3&%zz=1&%FFtoken=t1") }
+
+    query_string = logs.first["event"]["http_request_received"]["query_string"]
+    expect(query_string).to eq("user[password]=[FILTERED]&user%5Bpassword_confirmation%5D=[FILTERED]&user[name]=Jane&pass%77ord=[FILTERED]&%zz=1&%FFtoken=[FILTERED]")
+  end
+
+  it "filter the query string with custom query_string_filters" do
+    logs = capture_logs do
+      with_query_string_filters(["code", :page]) { middleware.call request_with_query_string("password=hunter2&page=2&Code=c1&q=search") }
+    end
+
+    query_string = logs.first["event"]["http_request_received"]["query_string"]
+    expect(query_string).to eq("password=hunter2&page=[FILTERED]&Code=[FILTERED]&q=search")
+  end
+
+  it "filter the query string with Regexp query_string_filters, ignoring Procs" do
+    filters = [/\Aq\z/, /sig/, ->(_name, value) { value.replace("changed") }]
+
+    logs = capture_logs do
+      with_query_string_filters(filters) { middleware.call request_with_query_string("q=1&query=2&Q=3&x_sig=abc&page=4") }
+    end
+
+    query_string = logs.first["event"]["http_request_received"]["query_string"]
+    expect(query_string).to eq("q=[FILTERED]&query=2&Q=3&x_sig=[FILTERED]&page=4")
+  end
+
+  it "log the query string and URLs unfiltered when query_string_filters is set to an empty list" do
+    app = ->(env) { [302, { "Location" => "https://example.com/next?token=t1" }, []] }
+    request = request_with_query_string("password=hunter2&token=t1", "HTTP_REFERER" => "https://example.com/signup?password=hunter2")
+
+    logs = capture_logs { with_query_string_filters([]) { described_class.new(app).call request } }
+
+    expect(logs.first["event"]["http_request_received"]["query_string"]).to eq("password=hunter2&token=t1")
+    expect(JSON.parse(logs.first["event"]["http_request_received"]["headers_json"])["Referer"]).to eq("https://example.com/signup?password=hunter2")
+    expect(JSON.parse(logs.last["event"]["http_response_sent"]["headers_json"])["Location"]).to eq("https://example.com/next?token=t1")
+  end
+
+  it "filter the query of the URLs in the Referer request header and the Location response header" do
+    app = ->(env) { [302, { "Location" => "https://example.com/next?token=t1&step=2#top", "Content-Type" => "text/plain" }, []] }
+    request = Rack::MockRequest.env_for("https://example.com/test-page", "HTTP_REFERER" => "https://example.com/signup?password=hunter2&ref=ad")
+
+    logs = capture_logs { described_class.new(app).call request }
+
+    request_headers = JSON.parse(logs.first["event"]["http_request_received"]["headers_json"])
+    expect(request_headers["Referer"]).to eq("https://example.com/signup?password=[FILTERED]&ref=ad")
+    response_headers = JSON.parse(logs.last["event"]["http_response_sent"]["headers_json"])
+    expect(response_headers).to eq({"Location" => "https://example.com/next?token=[FILTERED]&step=2#top", "Content-Type" => "text/plain"})
+  end
+
+  it "filter the query of the URL in a lower-case location response header" do
+    app = ->(env) { [302, { "location" => "/next?client_secret=s1&step=2" }, []] }
+
+    logs = capture_logs { described_class.new(app).call mock_request }
+
+    response_headers = JSON.parse(logs.last["event"]["http_response_sent"]["headers_json"])
+    expect(response_headers).to eq({"location" => "/next?client_secret=[FILTERED]&step=2"})
+  end
+
+  it "filter the query of the URL in the Location header of the single collapsed event" do
+    app = ->(env) { [302, { "location" => "/next?token=t1&step=2" }, []] }
+    stack = Logtail::Integrations::Rack::HTTPContext.new(described_class.new(app))
+
+    logs = capture_logs { with_collapse_into_single_event { stack.call mock_request } }
+
+    expect(logs.length).to eq(1)
+    response_headers = JSON.parse(logs.first["event"]["http_response_sent"]["headers_json"])
+    expect(response_headers).to eq({"location" => "/next?token=[FILTERED]&step=2"})
+  end
+
   it "log the content length of a Rack 3 response with lower-case header names" do
     app = ->(env) { [200, { "content-type" => "text/plain", "content-length" => "5" }, ["hello"]] }
 
@@ -154,6 +241,19 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     blk.call
   ensure
     Logtail::Integrations::Rack::HTTPEvents.http_header_filters = Logtail::Integrations::Rack::HTTPEvents::DEFAULT_HTTP_HEADER_FILTERS
+  end
+
+  def with_query_string_filters(filters, &blk)
+    Logtail::Integrations::Rack::HTTPEvents.query_string_filters = filters
+
+    blk.call
+  ensure
+    Logtail::Integrations::Rack::HTTPEvents.query_string_filters = Logtail::Integrations::Rack::HTTPEvents::DEFAULT_QUERY_STRING_FILTERS
+  end
+
+  # Sets QUERY_STRING directly, as some of the query strings aren't valid URIs
+  def request_with_query_string(query_string, env = {})
+    Rack::MockRequest.env_for("https://example.com/test-page", env).merge("QUERY_STRING" => query_string)
   end
 
   def with_collapse_into_single_event(&blk)
