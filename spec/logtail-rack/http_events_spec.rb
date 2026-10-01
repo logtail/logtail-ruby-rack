@@ -212,6 +212,21 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     expect(logs.first["event"]["http_response_sent"]["status"]).to eq(500)
   end
 
+  it "re-raise the exception of the app when logging its response fails" do
+    error = RuntimeError.new("boom")
+    app = ->(env) { raise error }
+    old_logger = Logtail::Config.instance.logger
+    failing_logger = Logtail::Logger.new(StringIO.new)
+    allow(failing_logger).to receive(:info).and_raise(IOError, "closed stream")
+    Logtail::Config.instance.logger = failing_logger
+
+    with_collapse_into_single_event do
+      expect { described_class.new(app).call mock_request }.to raise_error(RuntimeError) { |raised| expect(raised).to be(error) }
+    end
+  ensure
+    Logtail::Config.instance.logger = old_logger
+  end
+
   it "resolve the status of an exception to 500 by default" do
     expect(described_class.status_for_exception).to be(described_class::DEFAULT_STATUS_FOR_EXCEPTION)
     expect(described_class.status_for_exception.call(RuntimeError.new("boom"))).to eq(500)
