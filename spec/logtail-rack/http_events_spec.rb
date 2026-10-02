@@ -22,7 +22,7 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
 
     runtimes = logs.map { |log| log["context"]["runtime"] }
     expect(runtimes.map { |runtime| runtime["file"] }).to all(end_with("lib/logtail-rack/http_events.rb"))
-    expect(runtimes.map { |runtime| runtime["frame_label"] }).to all(match(/(\A|#)call\z/))
+    expect(runtimes.map { |runtime| runtime["frame_label"] }).to all(match(/\A(Logtail::Integrations::Rack::HTTPEvents#)?call\z/))
   end
 
   it "log the single event with this middleware's call as its runtime context" do
@@ -31,7 +31,7 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
 
     runtime = logs.first["context"]["runtime"]
     expect(runtime["file"]).to end_with("lib/logtail-rack/http_events.rb")
-    expect(runtime["frame_label"]).to match(/(\A|#)call\z/)
+    expect(runtime["frame_label"]).to match(/\A(Logtail::Integrations::Rack::HTTPEvents#)?call\z/)
   end
 
   it "return the app's response when collapsing into a single event without HTTPContext" do

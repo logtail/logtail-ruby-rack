@@ -11,13 +11,13 @@ module Logtail
           begin
             status, headers, body = @app.call(env)
           rescue Exception => exception
-            log_safely(:fatal) do
+            Config.instance.logger.fatal do
               Events::Error.new(
                 name: exception.class.name,
                 error_message: exception.message,
                 backtrace: exception.backtrace
               )
-            end
+            end rescue logging_failed($!)
 
             raise exception
           end

@@ -23,6 +23,6 @@ RSpec.describe Logtail::Integrations::Rack::ErrorEvent do
 
     runtime = JSON.parse(io.string)["context"]["runtime"]
     expect(runtime["file"]).to end_with("lib/logtail-rack/error_event.rb")
-    expect(runtime["frame_label"]).to match(/(\A|#)call\z/)
+    expect(runtime["frame_label"]).to match(/\A(Logtail::Integrations::Rack::ErrorEvent#)?call\z/)
   end
 end

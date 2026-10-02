@@ -26,12 +26,15 @@ module Logtail
         end
 
         private
-          # Logs the event the block builds. Logging must never fail the request, so an error raised
-          # while building or writing the event only goes to the debug logger.
-          def log_safely(severity, &block)
-            Config.instance.logger.public_send(severity, &block)
-          rescue StandardError => e
-            Config.instance.debug { "#{self.class.name} could not log an event: #{e.inspect}\n\n#{e.backtrace}" }
+          # Logging must never fail the request, so an error raised while building or writing an event
+          # only goes to the debug logger. The middlewares call the logger themselves, so that the
+          # runtime context of the line points to them, and rescue the error with this method:
+          #
+          #   Config.instance.logger.info do
+          #     ...
+          #   end rescue logging_failed($!)
+          def logging_failed(error)
+            Config.instance.debug { "#{self.class.name} could not log an event: #{error.inspect}\n\n#{error.backtrace}" }
           end
       end
     end
