@@ -42,6 +42,7 @@ module Logtail
               nil
             end
           rescue Exception => e
+            Logtail::Config.instance.debug { "Could not obtain the session id: #{e.inspect}\n\n#{e.backtrace}" }
             nil
           end
       end

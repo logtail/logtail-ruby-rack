@@ -17,7 +17,7 @@ module Logtail
                 error_message: exception.message,
                 backtrace: exception.backtrace
               )
-            end
+            end rescue logging_failed($!)
 
             raise exception
           end

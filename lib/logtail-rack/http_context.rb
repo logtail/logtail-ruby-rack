@@ -1,3 +1,4 @@
+require "logtail/config"
 require "logtail/contexts/http"
 require "logtail/current_context"
 require "logtail-rack/middleware"
@@ -10,19 +11,30 @@ module Logtail
       # A Rack middleware that is reponsible for adding the HTTP context {Logtail::Contexts::HTTP}.
       class HTTPContext < Middleware
         def call(env)
-          request = Util::Request.new(env)
-          context = Contexts::HTTP.new(
-            host: Util::Encoding.force_utf8_encoding(request.host),
-            method: Util::Encoding.force_utf8_encoding(request.request_method),
-            path: request.path,
-            remote_addr: Util::Encoding.force_utf8_encoding(request.ip),
-            request_id: request.request_id
-          )
-
-          CurrentContext.with(context.to_hash) do
+          context = get_http_context(env)
+          if context
+            CurrentContext.with(context) do
+              @app.call(env)
+            end
+          else
             @app.call(env)
           end
         end
+
+        private
+          def get_http_context(env)
+            request = Util::Request.new(env)
+            Contexts::HTTP.new(
+              host: Util::Encoding.force_utf8_encoding(request.host),
+              method: Util::Encoding.force_utf8_encoding(request.request_method),
+              path: request.path,
+              remote_addr: Util::Encoding.force_utf8_encoding(request.ip),
+              request_id: request.request_id
+            ).to_hash
+          rescue StandardError => e
+            Logtail::Config.instance.debug { "Could not build the HTTP context: #{e.inspect}\n\n#{e.backtrace}" }
+            nil
+          end
       end
     end
   end

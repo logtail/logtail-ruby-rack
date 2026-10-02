@@ -13,6 +13,10 @@ module Logtail
       REQUEST_ID_KEY_NAME2 = 'HTTP_X_REQUEST_ID'.freeze
 
       def body_content
+        # Rack 3 allows a missing or non-rewindable input, and reading one that can't be rewound takes the body
+        # from the app
+        return nil unless body.respond_to?(:rewind)
+
         content = body.read
         body.rewind
         content
