@@ -16,6 +16,7 @@ module Logtail
       # response events. The {Events::HTTPRequest} and {Events::HTTPResponse} events
       # respectively.
       class HTTPEvents < Middleware
+        DEFAULT_STATUS_FOR_EXCEPTION = ->(_exception) { 500 }
         DEFAULT_HTTP_HEADER_FILTERS = ["Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"].freeze
         DEFAULT_QUERY_STRING_FILTERS = %w[passw secret token _key crypt salt certificate otp ssn cvv cvc].freeze
 
@@ -107,6 +108,29 @@ module Logtail
             @silence_request
           end
 
+          # When the app raises instead of returning a response, the response event is still
+          # logged, and the exception is re-raised unchanged. This setting resolves the HTTP
+          # status of that event: a callable that receives the exception and returns an Integer
+          # status. The default, {DEFAULT_STATUS_FOR_EXCEPTION}, returns 500, and so does a
+          # callable that raises itself.
+          #
+          # @example
+          #   Logtail::Integrations::Rack::HTTPEvents.status_for_exception = lambda do |exception|
+          #     exception.is_a?(MyApp::NotFound) ? 404 : 500
+          #   end
+          def status_for_exception=(callable)
+            if !callable.respond_to?(:call)
+              raise ArgumentError.new("The value passed to #status_for_exception must respond to #call")
+            end
+
+            @status_for_exception = callable
+          end
+
+          # Accessor method for {#status_for_exception=}
+          def status_for_exception
+            @status_for_exception
+          end
+
           # Filter sensitive HTTP headers (such as "Authorization: Bearer secret_token")
           #
           # Filtered HTTP header values will be sent to Better Stack as "[FILTERED]"
@@ -170,6 +194,7 @@ module Logtail
           end
         end
 
+        self.status_for_exception = DEFAULT_STATUS_FOR_EXCEPTION
         self.http_header_filters = DEFAULT_HTTP_HEADER_FILTERS
         self.query_string_filters = DEFAULT_QUERY_STRING_FILTERS
 
@@ -193,7 +218,7 @@ module Logtail
 
           elsif collapse_into_single_event?
             request_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-            status, headers, body = @app.call(env)
+            status, headers, body = call_app(env, request, request_start)
             request_end = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
             Config.instance.logger.info do
@@ -264,7 +289,7 @@ module Logtail
             end rescue logging_failed($!)
 
             request_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-            status, headers, body = @app.call(env)
+            status, headers, body = call_app(env, request, request_start)
             request_end = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
             Config.instance.logger.info do
@@ -321,6 +346,55 @@ module Logtail
             else
               false
             end
+          end
+
+          # Calls the app. When it raises instead of returning a response, logs the response
+          # event with the status from {.status_for_exception} and re-raises the exception.
+          def call_app(env, request, request_start)
+            @app.call(env)
+          rescue Exception => exception
+            log_exception_response(request, exception, request_start)
+            raise exception
+          end
+
+          # Never raises, so that the exception of the app is the one that propagates.
+          def log_exception_response(request, exception, request_start)
+            request_end = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+            Config.instance.logger.info do
+              duration_ms = ((request_end - request_start) * 1000.0).round(1)
+
+              http_response = HTTPResponse.new(
+                http_context: collapse_into_single_event? ? CurrentContext.fetch(:http, nil) : nil,
+                request_id: request.request_id,
+                status: status_for_exception(exception),
+                duration_ms: duration_ms,
+              )
+
+              {
+                message: http_response.message,
+                event: {
+                  http_response_sent: {
+                    body: http_response.body,
+                    content_length: http_response.content_length,
+                    headers_json: http_response.headers_json,
+                    request_id: http_response.request_id,
+                    service_name: http_response.service_name,
+                    status: http_response.status,
+                    duration_ms: http_response.duration_ms,
+                  }
+                }
+              }
+            end
+          rescue Exception => e
+            Config.instance.debug { "Failed to log the response of a request that raised #{exception.class}: #{e.class}: #{e.message}" }
+          end
+
+          def status_for_exception(exception)
+            self.class.status_for_exception.call(exception)
+          rescue Exception => e
+            Config.instance.debug { "status_for_exception raised #{e.class}: #{e.message}, logging status 500" }
+            500
           end
 
           def filter_http_headers(headers)

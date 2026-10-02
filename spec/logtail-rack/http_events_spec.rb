@@ -336,6 +336,109 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     expect(logs.first["event"]["http_response_sent"]["duration_ms"]).to eq(39.2)
   end
 
+  it "log a response with status 500 when the app raises, and re-raise the exception unchanged" do
+    error = RuntimeError.new("boom")
+    app = ->(env) { raise error }
+    allow(Process).to receive(:clock_gettime).and_call_original
+    allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(100.0, 100.0392345)
+
+    logs = capture_logs do
+      expect { described_class.new(app).call mock_request }.to raise_error(RuntimeError) { |raised| expect(raised).to be(error) }
+    end
+
+    expect(logs.map { |log| log["message"] }).to eq(['Started GET "/test-page"', "Completed 500 Internal Server Error in 39.2ms"])
+    http_response_sent = logs.last["event"]["http_response_sent"]
+    expect(http_response_sent["status"]).to eq(500)
+    expect(http_response_sent["duration_ms"]).to eq(39.2)
+    expect(http_response_sent["headers_json"]).to be_nil
+    expect(http_response_sent["body"]).to be_nil
+  end
+
+  it "log a response with status 500 when the app raises an exception that is not a StandardError" do
+    app = ->(env) { raise NotImplementedError, "not implemented" }
+
+    logs = capture_logs do
+      expect { described_class.new(app).call mock_request }.to raise_error(NotImplementedError, "not implemented")
+    end
+
+    expect(logs.last["event"]["http_response_sent"]["status"]).to eq(500)
+  end
+
+  it "log the status returned by status_for_exception when the app raises" do
+    error = ArgumentError.new("no such record")
+    app = ->(env) { raise error }
+    resolved = []
+    status_for_exception = lambda do |exception|
+      resolved << exception
+      404
+    end
+
+    logs = capture_logs do
+      with_status_for_exception(status_for_exception) do
+        expect { described_class.new(app).call mock_request }.to raise_error(ArgumentError) { |raised| expect(raised).to be(error) }
+      end
+    end
+
+    expect(resolved.length).to eq(1)
+    expect(resolved.first).to be(error)
+    expect(logs.last["message"]).to match(/\ACompleted 404 Not Found in \d+\.\dms\z/)
+    expect(logs.last["event"]["http_response_sent"]["status"]).to eq(404)
+  end
+
+  it "log the status 500 when status_for_exception raises itself" do
+    error = RuntimeError.new("boom")
+    app = ->(env) { raise error }
+
+    logs = capture_logs do
+      with_status_for_exception(->(_exception) { raise "status_for_exception failed" }) do
+        expect { described_class.new(app).call mock_request }.to raise_error(RuntimeError) { |raised| expect(raised).to be(error) }
+      end
+    end
+
+    expect(logs.last["event"]["http_response_sent"]["status"]).to eq(500)
+  end
+
+  it "log the single collapsed event with status 500 when the app raises" do
+    app = ->(env) { raise "boom" }
+    stack = Logtail::Integrations::Rack::HTTPContext.new(described_class.new(app))
+    allow(Process).to receive(:clock_gettime).and_call_original
+    allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(100.0, 100.0392345)
+
+    logs = capture_logs do
+      with_collapse_into_single_event do
+        expect { stack.call mock_request }.to raise_error(RuntimeError, "boom")
+      end
+    end
+
+    expect(logs.length).to eq(1)
+    expect(logs.first["message"]).to eq("GET /test-page completed with 500 Internal Server Error in 39.2ms")
+    expect(logs.first["event"]["http_response_sent"]["status"]).to eq(500)
+  end
+
+  it "re-raise the exception of the app when logging its response fails" do
+    error = RuntimeError.new("boom")
+    app = ->(env) { raise error }
+    old_logger = Logtail::Config.instance.logger
+    failing_logger = Logtail::Logger.new(StringIO.new)
+    allow(failing_logger).to receive(:info).and_raise(IOError, "closed stream")
+    Logtail::Config.instance.logger = failing_logger
+
+    with_collapse_into_single_event do
+      expect { described_class.new(app).call mock_request }.to raise_error(RuntimeError) { |raised| expect(raised).to be(error) }
+    end
+  ensure
+    Logtail::Config.instance.logger = old_logger
+  end
+
+  it "resolve the status of an exception to 500 by default" do
+    expect(described_class.status_for_exception).to be(described_class::DEFAULT_STATUS_FOR_EXCEPTION)
+    expect(described_class.status_for_exception.call(RuntimeError.new("boom"))).to eq(500)
+  end
+
+  it "require status_for_exception to be callable" do
+    expect { described_class.status_for_exception = 404 }.to raise_error(ArgumentError)
+  end
+
   def capture_logs(&blk)
     old_logger = Logtail::Config.instance.logger
 
@@ -405,5 +508,13 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     blk.call
   ensure
     Logtail::Integrations::Rack::HTTPEvents.collapse_into_single_event = false
+  end
+
+  def with_status_for_exception(status_for_exception, &blk)
+    Logtail::Integrations::Rack::HTTPEvents.status_for_exception = status_for_exception
+
+    blk.call
+  ensure
+    Logtail::Integrations::Rack::HTTPEvents.status_for_exception = Logtail::Integrations::Rack::HTTPEvents::DEFAULT_STATUS_FOR_EXCEPTION
   end
 end
