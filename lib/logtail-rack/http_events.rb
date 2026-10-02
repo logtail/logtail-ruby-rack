@@ -1,4 +1,5 @@
 require "set"
+require "uri"
 
 require "logtail/config"
 require "logtail/contexts/http"
@@ -16,6 +17,7 @@ module Logtail
       # respectively.
       class HTTPEvents < Middleware
         DEFAULT_HTTP_HEADER_FILTERS = ["Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"].freeze
+        DEFAULT_QUERY_STRING_FILTERS = %w[passw secret token _key crypt salt certificate otp ssn cvv cvc].freeze
 
         class << self
           # Allows you to capture the HTTP request body, default is off (false).
@@ -123,14 +125,59 @@ module Logtail
             @http_header_filters
           end
 
+          # Filter sensitive query string parameters (such as "?token=secret_token")
+          #
+          # Filtered values will be sent to Better Stack as "[FILTERED]", in the query string of
+          # the request event and in the query of the URLs in the Referer and Location headers.
+          # Like Rails' filter_parameters, a String or Symbol filters every parameter whose
+          # URL-decoded name contains it, ignoring case, and a Regexp every name it matches.
+          #
+          # {DEFAULT_QUERY_STRING_FILTERS} are filtered out of the box. Setting this replaces
+          # the whole list, pass an empty list to log query strings unfiltered.
+          #
+          # @example
+          #   Logtail::Integrations::Rack::HTTPEvents.query_string_filters = Logtail::Integrations::Rack::HTTPEvents::DEFAULT_QUERY_STRING_FILTERS + ["code", /\Aapi_/]
+          def query_string_filters=(value)
+            strings = value.select { |filter| filter.is_a?(String) || filter.is_a?(Symbol) }
+            regexps = value.select { |filter| filter.is_a?(Regexp) }
+            if !strings.empty?
+              regexps << Regexp.new(strings.map { |filter| Regexp.escape(filter.to_s) }.join("|"), Regexp::IGNORECASE)
+            end
+
+            @query_string_filters = value
+            @query_string_filter_regexps = regexps
+          end
+
+          # Accessor method for {#query_string_filters=}
+          def query_string_filters
+            @query_string_filters
+          end
+
+          # Whether {#query_string_filters} filter the parameter with this name from a query string
+          def filter_query_string_parameter?(name)
+            begin
+              name = URI.decode_www_form_component(name)
+            rescue ArgumentError
+              # Invalid %-encoding, match the name as it is
+            end
+
+            name = name.scrub
+            @query_string_filter_regexps.any? { |regexp| regexp =~ name }
+          end
+
           def normalize_header_name(name)
             name.to_s.downcase.gsub("-", "_")
           end
         end
 
         self.http_header_filters = DEFAULT_HTTP_HEADER_FILTERS
+        self.query_string_filters = DEFAULT_QUERY_STRING_FILTERS
 
         CONTENT_LENGTH_KEY = 'content-length'.freeze
+        # A query string parameter name and its value, up to the next separator
+        QUERY_STRING_PARAMETER = /([^&;=]+)=([^&;]+)/
+        URL_QUERY = /\?([^#]*)/
+        URL_HEADERS = ["referer", "location"].freeze
 
         def call(env)
           request = Util::Request.new(env)
@@ -191,7 +238,7 @@ module Logtail
                 method: request.request_method,
                 path: request.path,
                 port: request.port,
-                query_string: Util::Encoding.force_utf8_encoding(request.query_string),
+                query_string: filter_query_string(Util::Encoding.force_utf8_encoding(request.query_string)),
                 request_id: request.request_id,
                 scheme: Util::Encoding.force_utf8_encoding(request.scheme),
               )
@@ -280,8 +327,27 @@ module Logtail
             headers.map do |name, value|
               normalized_name = self.class.normalize_header_name(name)
               is_filtered = self.class.http_header_filters.include?(normalized_name)
+              value = filter_url_query(value) if URL_HEADERS.include?(normalized_name)
               [name, is_filtered ? "[FILTERED]" : value]
             end.to_h
+          end
+
+          # Replaces the value of every parameter that {.query_string_filters} match with
+          # "[FILTERED]", leaving the rest of the query string unchanged.
+          def filter_query_string(query_string)
+            return query_string if !query_string.is_a?(String) || self.class.query_string_filters.empty?
+
+            query_string.gsub(QUERY_STRING_PARAMETER) do |parameter|
+              name = Regexp.last_match(1)
+              self.class.filter_query_string_parameter?(name) ? "#{name}=[FILTERED]" : parameter
+            end
+          end
+
+          # Filters the query of the URL in a Referer or Location header.
+          def filter_url_query(url)
+            return url if !url.is_a?(String) || !url.include?("?") || self.class.query_string_filters.empty?
+
+            Util::Encoding.force_utf8_encoding(url).sub(URL_QUERY) { "?#{filter_query_string(Regexp.last_match(1))}" }
           end
 
           # Rack 3 applications return "content-length", older ones usually "Content-Length".
