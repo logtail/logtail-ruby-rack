@@ -17,6 +17,23 @@ RSpec.describe Logtail::Integrations::Rack::HTTPEvents do
     expect(logs.map { |log| log['message'] }).to match(['Started GET "/test-page"', /Completed 200 OK in \d+\.\d+ms/])
   end
 
+  it "log the request and the response with this middleware's call as their runtime context" do
+    logs = capture_logs { middleware.call mock_request }
+
+    runtimes = logs.map { |log| log["context"]["runtime"] }
+    expect(runtimes.map { |runtime| runtime["file"] }).to all(end_with("lib/logtail-rack/http_events.rb"))
+    expect(runtimes.map { |runtime| runtime["frame_label"] }).to all(match(/(\A|#)call\z/))
+  end
+
+  it "log the single event with this middleware's call as its runtime context" do
+    stack = Logtail::Integrations::Rack::HTTPContext.new(middleware)
+    logs = capture_logs { with_collapse_into_single_event { stack.call mock_request } }
+
+    runtime = logs.first["context"]["runtime"]
+    expect(runtime["file"]).to end_with("lib/logtail-rack/http_events.rb")
+    expect(runtime["frame_label"]).to match(/(\A|#)call\z/)
+  end
+
   it "return the app's response when collapsing into a single event without HTTPContext" do
     app = ->(env) { [200, { "content-type" => "text/plain" }, ["hello"]] }
 

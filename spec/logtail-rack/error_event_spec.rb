@@ -11,4 +11,18 @@ RSpec.describe Logtail::Integrations::Rack::ErrorEvent do
 
     expect { described_class.new(app).call(Rack::MockRequest.env_for("https://example.com/test-page")) }.to raise_error(RuntimeError, "app failure")
   end
+
+  it "log the error with this middleware's call as its runtime context" do
+    app = ->(env) { raise "app failure" }
+    io = StringIO.new
+    logger = Logtail::Logger.new(io)
+    logger.formatter = Logtail::Logger::JSONFormatter.new
+    allow(Logtail::Config.instance).to receive(:logger).and_return(logger)
+
+    expect { described_class.new(app).call(Rack::MockRequest.env_for("https://example.com/test-page")) }.to raise_error(RuntimeError, "app failure")
+
+    runtime = JSON.parse(io.string)["context"]["runtime"]
+    expect(runtime["file"]).to end_with("lib/logtail-rack/error_event.rb")
+    expect(runtime["frame_label"]).to match(/(\A|#)call\z/)
+  end
 end
