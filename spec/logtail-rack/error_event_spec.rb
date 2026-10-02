@@ -23,6 +23,7 @@ RSpec.describe Logtail::Integrations::Rack::ErrorEvent do
 
     runtime = JSON.parse(io.string)["context"]["runtime"]
     expect(runtime["file"]).to end_with("lib/logtail-rack/error_event.rb")
-    expect(runtime["frame_label"]).to match(/\A(Logtail::Integrations::Rack::ErrorEvent#)?call\z/)
+    # Ruby 3.3 and older label code in a rescue clause "rescue in call"
+    expect(runtime["frame_label"]).to match(/\A(rescue in )?(Logtail::Integrations::Rack::ErrorEvent#)?call\z/)
   end
 end
