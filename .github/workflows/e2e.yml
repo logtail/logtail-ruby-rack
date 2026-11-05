@@ -6,8 +6,7 @@ name: E2E
 # back through the testing team's SQL API connection, checks them exactly against e2e/expected.json (the app's three
 # lines, the request, response and error events, nothing missing, extra or duplicated), and deletes the source
 # again, together with sources of earlier runs left behind for more than 3 hours. e2e/plan.rb plans four legs:
-#   floor   Ruby 2.7 with Rack 1.2.0, the oldest the gemspec allows, and logtail 0.1.15, the oldest that runs the
-#           example (the gemspec allows 0.1.0)
+#   floor   Ruby 2.7 with Rack 1.2.0 and logtail 0.1.15, the oldest releases the gemspec allows
 #   rack2   Ruby 3.2 with the newest Rack 2 and the newest logtail
 #   latest  the newest stable Ruby with the newest rack and logtail releases; Bundler failing to install them, say a
 #           Rack 4 that the gemspec's "< 4.0" excludes, fails the job
