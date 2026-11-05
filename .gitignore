@@ -10,7 +10,6 @@
 .ruby-version
 coverage
 Gemfile.lock
-!/example-project/Gemfile.lock
 *.swp
 *.gem
 

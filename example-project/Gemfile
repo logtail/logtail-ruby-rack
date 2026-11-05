@@ -2,6 +2,11 @@ source "https://rubygems.org"
 
 gem "rack", "~> 3.0"
 
-gem "rackup", "~> 2.1"
+# The rackup command, its own gem since Rack 3. With an older Rack this resolves to an empty release
+# and the rackup command of the rack gem starts the app.
+gem "rackup"
+
+# The web server rackup starts, no longer part of Ruby since 3.0
+gem "webrick"
 
 gem "logtail-rack", "~> 0.2.6"

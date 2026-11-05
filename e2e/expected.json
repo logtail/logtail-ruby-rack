@@ -1,0 +1,42 @@
+[
+  {
+    "level": "info",
+    "message": "Started GET \"/\"",
+    "contains": {"event": {"http_request_received": {"method": "GET", "path": "/", "host": "localhost", "port": 9292, "scheme": "http", "headers_json": {"Host": "localhost:9292"}}}, "context": {"runtime": {"file": "lib/logtail-rack/http_events.rb"}, "http": {"method": "GET", "path": "/", "host": "localhost"}}}
+  },
+  {
+    "level": "info",
+    "message": "I am using Better Stack! 🚀",
+    "contains": {"context": {"runtime": {"file": "logging_app.rb"}, "http": {"method": "GET", "path": "/", "host": "localhost"}}}
+  },
+  {
+    "level": "debug",
+    "message": "Logging structured data...",
+    "contains": {"name": {"first": "John", "last": "Smith"}, "id": 123456, "context": {"runtime": {"file": "logging_app.rb"}, "http": {"method": "GET", "path": "/", "host": "localhost"}}}
+  },
+  {
+    "level": "warn",
+    "message": "Log structured data",
+    "contains": {"item": {"url": "https://fictional-store.com/item-123", "price": 100.0}, "context": {"runtime": {"file": "logging_app.rb"}, "http": {"method": "GET", "path": "/", "host": "localhost"}}}
+  },
+  {
+    "level": "info",
+    "message_prefix": "Completed 200 OK in ",
+    "contains": {"event": {"http_response_sent": {"status": 200, "headers_json": {"content-type": "text/plain"}}}, "context": {"runtime": {"file": "lib/logtail-rack/http_events.rb"}, "http": {"method": "GET", "path": "/", "host": "localhost"}}}
+  },
+  {
+    "level": "info",
+    "message": "Started GET \"/error\"",
+    "contains": {"event": {"http_request_received": {"method": "GET", "path": "/error", "host": "localhost", "port": 9292, "scheme": "http", "headers_json": {"Host": "localhost:9292"}}}, "context": {"runtime": {"file": "lib/logtail-rack/http_events.rb"}, "http": {"method": "GET", "path": "/error", "host": "localhost"}}}
+  },
+  {
+    "level": "fatal",
+    "message": "RuntimeError (Visiting /error raises an error. You should see it in Better Stack.)",
+    "contains": {"error": {"name": "RuntimeError", "message": "Visiting /error raises an error. You should see it in Better Stack.", "backtrace_json": ["example-project/logging_app.rb:9:in "]}, "context": {"runtime": {"file": "lib/logtail-rack/error_event.rb"}, "http": {"method": "GET", "path": "/error", "host": "localhost"}}}
+  },
+  {
+    "level": "info",
+    "message_prefix": "Completed 500 Internal Server Error in ",
+    "contains": {"event": {"http_response_sent": {"status": 500}}, "context": {"runtime": {"file": "lib/logtail-rack/http_events.rb"}, "http": {"method": "GET", "path": "/error", "host": "localhost"}}}
+  }
+]
