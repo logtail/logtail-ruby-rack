@@ -29,9 +29,9 @@ NOT_IN_NAMES = ':"<>|*?/\\'.chars.freeze
 
 # The gemspec allows Ruby 2.3, but main.yml tests Rack 1, the oldest the gemspec allows, on Ruby 2.7 only.
 FLOOR_RUBY = "2.7".freeze
-# The gemspec allows logtail 0.1.0, but releases before 0.1.14 have no ingesting_host option, which the example and
-# the README pass, and 0.1.14 calls Rails' String#present? and fails without Rails. Remove this once the gemspec
-# requires logtail >= 0.1.15.
+# The gemspec requires logtail 0.1.15 or newer, and the floor leg runs that floor: releases before 0.1.14 have no
+# ingesting_host option, which the example and the README pass, and 0.1.14 calls Rails' String#present? and fails
+# without Rails.
 FLOOR_LOGTAIL = Gem::Version.new("0.1.15")
 # The other Ruby main.yml tests the Rack pins on.
 RACK2_RUBY = "3.2".freeze
